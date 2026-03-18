@@ -1,0 +1,6 @@
+login.php
+*.log
+*.tmp
+runs/
+__pycache__/
+.env
