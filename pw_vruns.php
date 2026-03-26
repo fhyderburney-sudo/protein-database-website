@@ -71,6 +71,13 @@ echo "<tr><td>Sequence Count</td><td>" . htmlspecialchars($run['sequence_count']
 echo "<tr><td>Created At</td><td>" . htmlspecialchars($run['created_at']) . "</td></tr>";
 echo "<tr><td>Notes</td><td>" . htmlspecialchars($run['notes']) . "</td></tr>";
 echo "</table>";
+echo "<p><a href='pw_run_alignment.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run alignment for this dataset</a></p>";
+
+echo "<h2>Analysis Outputs</h2>";
+echo "<ul>";
+echo "<li><a href='runs/run_" . htmlspecialchars($run['run_id']) . "/alignment.aln'>Download alignment</a></li>";
+echo "<li><a href='runs/run_" . htmlspecialchars($run['run_id']) . "/conservation.png'>View conservation plot</a></li>";
+echo "</ul>";
 
 // Retrieve linked proteins for this run
 $protein_sql = "SELECT protein_id, accession, protein_name, organism, seq_length
