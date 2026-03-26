@@ -8,7 +8,7 @@ if (isset($_POST['fn']) && isset($_POST['sn'])) {
 }
 
 if (!(isset($_SESSION['forname']) && isset($_SESSION['surname']))) {
-    header('Location: complib.php');
+    header('Location: pw_complib.php');
     exit();
 }
 

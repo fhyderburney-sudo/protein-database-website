@@ -1,109 +1,51 @@
-Use this as the page where user can choose protein family and taxonomic group 
 <?php
 session_start();
 require_once 'login.php';
 include 'pw_redir.php';
 
-echo<<<_HEAD1
+echo <<<_HEAD1
 <html>
+<head>
+    <title>Example Dataset</title>
+</head>
 <body>
 _HEAD1;
 
-include 'menuf.php';
+include 'pw_menuf.php';
 
-// THE CONNECTION AND QUERY SECTIONS NEED TO BE MADE TO WORK FOR PHP 8 USING PDO... //
-$charset = 'utf8mb4'; 
-$dsn = "mysql:host=$db_hostname; dbname=$db_database; charset=$charset";
+echo <<<_MAIN1
+<h1>Example Dataset</h1>
 
-$options = [
-  PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-  PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-  PDO::ATTR_EMULATE_PREPARES => false,   
-];
+<p>
+This page provides access to the preloaded example dataset for the website.
+The example dataset is based on <strong>glucose-6-phosphatase proteins from Aves</strong>.
+</p>
 
-try {
-    $pdo = new PDO($dsn, $db_username, $db_password, $options);
-    
-    $query = "SELECT * FROM Manufacturers";
-    $stmt = $pdo->query($query);
-    $data = $stmt->fetchAll();
+<p>
+It is intended to demonstrate the core functionality of the website before a user creates their own analysis run.
+This includes the use of stored runs, linked protein sequences, and later will also include motif and sequence analysis outputs.
+</p>
 
-} catch (PDOException $e) {
-    die("Unable to connect to database or process query: " . $e->getMessage());
-}
+<h2>Dataset summary</h2>
+<ul>
+    <li>Protein family: glucose-6-phosphatase</li>
+    <li>Taxonomic group: Aves</li>
+    <li>Dataset type: preprocessed example run</li>
+</ul>
 
-$rows = count($data);
+<h2>View the example run</h2>
 
-$smask = $_SESSION['supmask'];
+<p>
+<a href="pw_vruns.php?run_id=1">Open the example dataset run</a>
+</p>
 
+<p>
+You can use this run to explore how the website stores and displays protein-related results.
+After that, you can create your own run using the New Analysis page.
+</p>
+_MAIN1;
 
-//verified
-for($j = 0 ; $j < $rows ; ++$j)
-  {
-    $row = $data[$j];
-    $sid[$j] = $row['id'];//can change for column name
-    $snm[$j] = $row['name'];//can change for column name 
-    $sact[$j] = 0;
-    $tvl = 1 << ($sid[$j] - 1);
-    
-    if($tvl == ($tvl & $smask)) {
-      $sact[$j] = 1;
-      }
-  }
-if(isset($_POST['supplier'])) 
-{
-   $supplier = $_POST['supplier'];
-   $nele = sizeof($supplier);
-     
-   for($k = 0; $k <$rows; ++$k) {
-       $sact[$k] = 0;
-       
-       for($j = 0 ; $j < $nele ; ++$j) {
-         if(strcmp($supplier[$j],$snm[$k]) == 0) {
-             $sact[$k] = 1;
-         }
-       }
-   }  
-   
-   $smask = 0;
-   
-   for($j = 0 ; $j < $rows ; ++$j)
-   {
-       if($sact[$j] == 1) {
-         $smask = $smask + (1 << ($sid[$j] - 1));
-       }
-   }
-   
-   $_SESSION['supmask'] = $smask;
-   
-}
-
-
-echo 'Currently selected Suppliers: ';
-
-for($j = 0 ; $j < $rows ; ++$j)
-  {
-    if($sact[$j] == 1) {
-    echo $snm[$j] ;
-    echo " ";
-	}
-
-}
-    
-echo  '<br><pre> <form action="p1.php" method="post">';
-
-for($j = 0 ; $j < $rows ; ++$j)
-  {
-  echo $snm[$j];
-	echo' <input type="checkbox" name="supplier[]" value="';
-	echo $snm[$j];
-  echo'"/>';
-	echo"\n";
-  }
-  
 echo <<<_TAIL1
- <input type="submit" value="OK" />
-</pre></form>
 </body>
 </html>
 _TAIL1;

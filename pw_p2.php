@@ -2,128 +2,101 @@
 session_start();
 require_once 'login.php';
 include 'pw_redir.php';
-echo<<<_HEAD1
+
+echo <<<_HEAD1
 <html>
+<head>
+    <title>New Analysis</title>
+</head>
 <body>
 _HEAD1;
+
 include 'pw_menuf.php';
-// THE CONNECTION AND QUERY SECTIONS NEED TO BE MADE TO WORK FOR PHP 8 USING PDO... //
-$charset = 'utfm8mb4'; 
-$dsn = "mysql:host=$db_hostname; dbname=$db_database; charset=$charset";
+
+// PDO connection
+$charset = 'utf8mb4';
+$dsn = "mysql:host=$hostname;dbname=$database;charset=$charset";
 
 $options = [
-  PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-  PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-  PDO::ATTR_EMULATE_PREPARES => false,   
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES => false,
 ];
 
 try {
-    $pdo = new PDO($dsn, $db_udername, $db_password, $options);
+    $pdo = new PDO($dsn, $username, $password, $options);
 } catch (PDOException $e) {
-    die("Unable to connect to database or process query: " . $e->getMessage());
+    die("Unable to connect to database: " . $e->getMessage());
 }
-
-$query = "SELECT * FROM Manufacturers";
-try {
-    $stmt = $pdo->query($query);
-    $data = $stmt->fetchAll();
-} catch (PDOException $e) {
-    die("Unable to process query: " . $e->getMessage());
-}
-
-$rows = count($data);
-$smask = $_SESSION['supmask'] ?? 0;
-$firstmn = false;
-$mansel = "(";
-
-for ($j = 0; $j < $rows; ++$j) {
-    $row = $data[$j];
-    $sid[$j] = $row[0];
-    $snm[$j] = $row[1];
-    $sact[$j] = 0;
-    $tvl = 1 << ($sid[$j] - 1);
-
-    if ($tvl == ($tvl & $smask)) {
-        $sact[$j] = 1;
-        if ($firstmn) $mansel .= " OR ";
-        $firstmn = true;
-        $mansel .= " (ManuID = " . (int)$sid[$j] . ")";
-    }
-}
-$mansel .= ")";
-
-$setpar = isset($_POST['natmax']);
 
 echo <<<_MAIN1
-<pre>
-This is the catalogue retrieval Page
-</pre>
+<h1>New Analysis</h1>
+<p>
+Use this page to create a new protein analysis run.
+Enter a protein family and a taxonomic group to save your query.
+</p>
 _MAIN1;
 
-if ($setpar) {
-    $firstsl = false;
-    $compsel = "SELECT catn FROM Compounds WHERE (";
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $protein_family = trim($_POST['protein_family'] ?? '');
+    $taxon_query = trim($_POST['taxon_query'] ?? '');
+    $notes = trim($_POST['notes'] ?? '');
 
-    if (($_POST['natmax'] != "") && ($_POST['natmin'] != "")) {
-        $compsel .= "(natm > " . (int)$_POST['natmin'] . " AND natm < " . (int)$_POST['natmax'] . ")";
-        $firstsl = true;
-    }
+    $user_forname = $_SESSION['forname'] ?? 'Unknown';
+    $user_surname = $_SESSION['surname'] ?? 'User';
 
-    if (($_POST['ncrmax'] != "") && ($_POST['ncrmin'] != "")) {
-        if ($firstsl) $compsel .= " AND ";
-        $compsel .= "(ncar > " . (int)$_POST['ncrmin'] . " AND ncar < " . (int)$_POST['ncrmax'] . ")";
-        $firstsl = true;
-    }
+    if ($protein_family === '' || $taxon_query === '') {
+        echo "<p><strong>Error:</strong> Protein family and taxonomic group are required.</p>";
+    } else {
+        $ncbi_query = $protein_family . "[Protein Name] AND " . $taxon_query . "[Organism]";
 
-    if (($_POST['nntmax'] != "") && ($_POST['nntmin'] != "")) {
-        if ($firstsl) $compsel .= " AND ";
-        $compsel .= "(nnit > " . (int)$_POST['nntmin'] . " AND nnit < " . (int)$_POST['nntmax'] . ")";
-        $firstsl = true;
-    }
-
-    if (($_POST['noxmax'] != "") && ($_POST['noxmin'] != "")) {
-        if ($firstsl) $compsel .= " AND ";
-        $compsel .= "(noxy > " . (int)$_POST['noxmin'] . " AND noxy < " . (int)$_POST['noxmax'] . ")";
-        $firstsl = true;
-    }
-
-    echo "<pre>";
-
-    if ($firstsl) {
-        $compsel .= ") AND " . $mansel;
-        echo $compsel;
-        echo "\n";
+        $sql = "INSERT INTO runs
+                (user_forname, user_surname, protein_family, taxon_query, ncbi_query, run_type, status, sequence_count, notes)
+                VALUES
+                (:ufn, :usn, :pf, :tq, :nq, :rt, :st, :sc, :nt)";
 
         try {
-            $stmt = $pdo->query($compsel);
-            $results = $stmt->fetchAll();
-            $rows = count($results);
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':ufn' => $user_forname,
+                ':usn' => $user_surname,
+                ':pf'  => $protein_family,
+                ':tq'  => $taxon_query,
+                ':nq'  => $ncbi_query,
+                ':rt'  => 'user',
+                ':st'  => 'pending',
+                ':sc'  => 0,
+                ':nt'  => $notes
+            ]);
 
-            if ($rows > 100) {
-                echo "Too many results $rows Max is 100\n";
-            } else {
-                for ($j = 0; $j < $rows; ++$j) {
-                    echo $results[$j][0], "\n";
-                }
-            }
+            $new_run_id = $pdo->lastInsertId();
+
+            echo "<h2>Run created successfully</h2>";
+            echo "<pre>";
+            echo "Run ID: " . htmlspecialchars($new_run_id) . "\n";
+            echo "Protein family: " . htmlspecialchars($protein_family) . "\n";
+            echo "Taxonomic group: " . htmlspecialchars($taxon_query) . "\n";
+            echo "NCBI query: " . htmlspecialchars($ncbi_query) . "\n";
+            echo "Status: pending\n";
+            echo "</pre>";
+            echo "<p><a href='pw_vruns.php?run_id=" . htmlspecialchars($new_run_id) . "'>View this run</a></p>";
+
         } catch (PDOException $e) {
-            die("Unable to process query: " . $e->getMessage());
+            die("Unable to create run: " . $e->getMessage());
         }
-    } else {
-        echo "No Query Given\n";
     }
-
-    echo "</pre>";
 }
 
 echo <<<_TAIL1
-<form action="p2.php" method="post"><pre>
-       Max Atoms      <input type="text" name="natmax"/>    Min Atoms    <input type="text" name="natmin"/>
-       Max Carbons    <input type="text" name="ncrmax"/>    Min Carbons  <input type="text" name="ncrmin"/>
-       Max Nitrogens  <input type="text" name="nntmax"/>    Min Nitrogens<input type="text" name="nntmin"/>
-       Max Oxygens    <input type="text" name="noxmax"/>    Min Oxygens  <input type="text" name="noxmin"/>
-                   <input type="submit" value="list" />
-</pre></form>
+<form action="pw_p2.php" method="post">
+<pre>
+Protein family     <input type="text" name="protein_family" size="40"/>
+Taxonomic group    <input type="text" name="taxon_query" size="40"/>
+Notes              <input type="text" name="notes" size="60"/>
+
+                   <input type="submit" value="Create Run"/>
+</pre>
+</form>
 
 </body>
 </html>
