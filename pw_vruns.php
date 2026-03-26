@@ -120,6 +120,48 @@ if (count($proteins) === 0) {
     echo "</table>";
 }
 
+// Retrieve output files for this run
+$file_sql = "SELECT file_id, file_type, file_path, description, created_at
+             FROM run_files
+             WHERE run_id = :run_id
+             ORDER BY created_at DESC, file_id DESC";
+
+try {
+    $file_stmt = $pdo->prepare($file_sql);
+    $file_stmt->execute([':run_id' => $run_id]);
+    $run_files = $file_stmt->fetchAll();
+} catch (PDOException $e) {
+    die("Unable to retrieve run files: " . $e->getMessage());
+}
+
+echo "<h2>Analysis Output Files</h2>";
+
+echo "<p><a href='pw_run_alignment.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run alignment for this dataset</a></p>";
+echo "<p><a href='pw_run_conservation.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run conservation analysis</a></p>";
+
+if (count($run_files) === 0) {
+    echo "<p>No output files have been recorded for this run yet.</p>";
+} else {
+    echo "<table border='1' cellpadding='6' cellspacing='0'>";
+    echo "<tr>";
+    echo "<th>File Type</th>";
+    echo "<th>Description</th>";
+    echo "<th>Created At</th>";
+    echo "<th>Open</th>";
+    echo "</tr>";
+
+    foreach ($run_files as $file) {
+        echo "<tr>";
+        echo "<td>" . htmlspecialchars($file['file_type']) . "</td>";
+        echo "<td>" . htmlspecialchars($file['description']) . "</td>";
+        echo "<td>" . htmlspecialchars($file['created_at']) . "</td>";
+        echo "<td><a href='" . htmlspecialchars($file['file_path']) . "'>View file</a></td>";
+        echo "</tr>";
+    }
+
+    echo "</table>";
+}
+
 echo "<p><a href='pw_pruns.php'>Back to Previous Runs</a></p>";
 
 echo <<<_TAIL1
