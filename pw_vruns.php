@@ -54,7 +54,7 @@ if (!$run) {
 
 echo <<<_MAIN1
 <h1>Run Details</h1>
-<p>This page shows the details of a selected analysis run.</p>
+<p>This page shows the details and outputs of a selected analysis run.</p>
 _MAIN1;
 
 echo "<h2>Run Metadata</h2>";
@@ -71,13 +71,11 @@ echo "<tr><td>Sequence Count</td><td>" . htmlspecialchars($run['sequence_count']
 echo "<tr><td>Created At</td><td>" . htmlspecialchars($run['created_at']) . "</td></tr>";
 echo "<tr><td>Notes</td><td>" . htmlspecialchars($run['notes']) . "</td></tr>";
 echo "</table>";
-echo "<p><a href='pw_run_alignment.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run alignment for this dataset</a></p>";
 
-echo "<h2>Analysis Outputs</h2>";
-echo "<ul>";
-echo "<li><a href='runs/run_" . htmlspecialchars($run['run_id']) . "/alignment.aln'>Download alignment</a></li>";
-echo "<li><a href='runs/run_" . htmlspecialchars($run['run_id']) . "/conservation.png'>View conservation plot</a></li>";
-echo "</ul>";
+echo "<h2>Analysis Actions</h2>";
+echo "<p><a href='pw_run_alignment.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run alignment for this dataset</a></p>";
+echo "<p><a href='pw_run_conservation.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run conservation analysis</a></p>";
+echo "<p><a href='pw_run_motifs.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run PROSITE motif scan for this dataset</a></p>";
 
 // Retrieve linked proteins for this run
 $protein_sql = "SELECT protein_id, accession, protein_name, organism, seq_length
@@ -120,6 +118,29 @@ if (count($proteins) === 0) {
     echo "</table>";
 }
 
+// Motif report preview
+$motif_txt = __DIR__ . "/runs/run_" . $run_id . "/motifs.txt";
+
+echo "<h2>Motif Report Preview</h2>";
+
+if (file_exists($motif_txt) && filesize($motif_txt) > 0) {
+    $preview = file($motif_txt);
+    $preview = array_slice($preview, 0, 40);
+    echo "<pre>" . htmlspecialchars(implode("", $preview)) . "</pre>";
+} else {
+    echo "<p>No motif report preview available yet.</p>";
+}
+
+// Conservation plot display
+$conservation_file = __DIR__ . "/runs/run_" . $run_id . "/conservation.1.png";
+echo "<h2>Conservation Plot</h2>";
+
+if (file_exists($conservation_file) && filesize($conservation_file) > 0) {
+    echo "<img src='runs/run_" . htmlspecialchars($run['run_id']) . "/conservation.1.png' width='700' alt='Conservation plot'>";
+} else {
+    echo "<p>No conservation plot available yet.</p>";
+}
+
 // Retrieve output files for this run
 $file_sql = "SELECT file_id, file_type, file_path, description, created_at
              FROM run_files
@@ -135,9 +156,6 @@ try {
 }
 
 echo "<h2>Analysis Output Files</h2>";
-
-echo "<p><a href='pw_run_alignment.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run alignment for this dataset</a></p>";
-echo "<p><a href='pw_run_conservation.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run conservation analysis</a></p>";
 
 if (count($run_files) === 0) {
     echo "<p>No output files have been recorded for this run yet.</p>";

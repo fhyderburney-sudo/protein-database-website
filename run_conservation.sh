@@ -5,7 +5,7 @@ RUN_ID="$1"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNDIR="$SCRIPT_DIR/runs/run_${RUN_ID}"
 INFILE="$RUNDIR/alignment.aln"
-OUTBASE="$RUNDIR/conservation"
+OUTBASE="$RUNDIR/conservation.png"
 
 if [ -z "$RUN_ID" ]; then
     echo "Usage: $0 RUN_ID"

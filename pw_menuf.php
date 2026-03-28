@@ -12,6 +12,7 @@ echo <<<_MENU1
     <td bgcolor="#DCEFFE" align="center"><a href="pw_p4.php">Plots</a></td>
     <td bgcolor="#DCEFFE" align="center"><a href="pw_props_in.php">Sequence Tools</a></td>
     <td bgcolor="#DCEFFE" align="center"><a href="pw_phelp.php">Help / About</a></td>
+    <td bgcolor="#DCEFFE" align="center"><a href="pw_credits.php">Credits</a></td>
     <td bgcolor="#DCEFFE" align="center"><a href="pw_p5.php">Exit</a></td>
   </tr>
 </table>
