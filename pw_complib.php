@@ -4,6 +4,17 @@ require_once 'login.php';
 
 echo <<<_HEAD1
 <html>
+<head>
+  <script type="text/javascript">
+  function showHelp(msg) {
+      document.getElementById("helpmsg").innerHTML = msg;
+  }
+  
+  function clearHelp() {
+      document.getElementById("helpmsg").innerHTML = "";
+  }
+  </script>
+<head>
 <body>
 _HEAD1;
 
@@ -65,3 +76,10 @@ echo <<<_TAIL1
 </html>
 _TAIL1;
 ?>
+
+<p id="helpmsg"></p>
+
+<form action="pw_index.php" method="post">
+    First Name <input type="text" name="fn" onfocus="showHelp('Enter your first name')" onblur="clearHelp()"/>
+    Second Name <input type="text" name="sn" onfocus="showHelp('Enter your surname')" onblur="clearHelp()"/>
+</form>

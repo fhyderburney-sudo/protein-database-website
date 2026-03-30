@@ -7,6 +7,32 @@ echo <<<_HEAD1
 <html>
 <head>
     <title>New Analysis</title>
+    <script type="text/javascript">
+    function validate(form) {
+        let fail = "";
+
+        if (form.protein_family.value.trim() === "") {
+            fail += "Protein family is required.\\n";
+        }
+
+        if (form.taxon_query.value.trim() === "") {
+            fail += "Taxonomic group is required.\\n";
+        }
+
+        if (form.max_sequences.value.trim() !== "") {
+            if (isNaN(form.max_sequences.value)) {
+                fail += "Max sequences must be a number.\\n";
+            }
+        }
+
+        if (fail === "") {
+            return true;
+        } else {
+            alert(fail);
+            return false;
+        }
+    }
+    </script>
 </head>
 <body>
 _HEAD1;
@@ -29,17 +55,12 @@ try {
     die("Unable to connect to database: " . $e->getMessage());
 }
 
-echo <<<_MAIN1
-<h1>New Analysis</h1>
-<p>
-Use this page to create a new protein analysis run.
-Enter a protein family and a taxonomic group to save your query.
-</p>
-_MAIN1;
+echo "<h1>New Analysis</h1>";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $protein_family = trim($_POST['protein_family'] ?? '');
     $taxon_query = trim($_POST['taxon_query'] ?? '');
+    $max_sequences = trim($_POST['max_sequences'] ?? '');
     $notes = trim($_POST['notes'] ?? '');
 
     $user_forname = $_SESSION['forname'] ?? 'Unknown';
@@ -48,12 +69,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($protein_family === '' || $taxon_query === '') {
         echo "<p><strong>Error:</strong> Protein family and taxonomic group are required.</p>";
     } else {
+        if ($max_sequences === '' || !ctype_digit($max_sequences)) {
+            $max_sequences = 20;
+        } else {
+            $max_sequences = (int)$max_sequences;
+        }
+
         $ncbi_query = $protein_family . "[Protein Name] AND " . $taxon_query . "[Organism]";
 
         $sql = "INSERT INTO runs
-                (user_forname, user_surname, protein_family, taxon_query, ncbi_query, run_type, status, sequence_count, notes)
+                (user_forname, user_surname, protein_family, taxon_query, max_sequences, ncbi_query, run_type, status, sequence_count, notes)
                 VALUES
-                (:ufn, :usn, :pf, :tq, :nq, :rt, :st, :sc, :nt)";
+                (:ufn, :usn, :pf, :tq, :mx, :nq, :rt, :st, :sc, :nt)";
 
         try {
             $stmt = $pdo->prepare($sql);
@@ -62,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':usn' => $user_surname,
                 ':pf'  => $protein_family,
                 ':tq'  => $taxon_query,
+                ':mx'  => $max_sequences,
                 ':nq'  => $ncbi_query,
                 ':rt'  => 'user',
                 ':st'  => 'pending',
@@ -72,14 +100,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $new_run_id = $pdo->lastInsertId();
 
             echo "<h2>Run created successfully</h2>";
-            echo "<pre>";
-            echo "Run ID: " . htmlspecialchars($new_run_id) . "\n";
-            echo "Protein family: " . htmlspecialchars($protein_family) . "\n";
-            echo "Taxonomic group: " . htmlspecialchars($taxon_query) . "\n";
-            echo "NCBI query: " . htmlspecialchars($ncbi_query) . "\n";
-            echo "Status: pending\n";
-            echo "</pre>";
-            echo "<p><a href='pw_vruns.php?run_id=" . htmlspecialchars($new_run_id) . "'>View this run</a></p>";
+
+            echo "<p><a href='pw_import_proteins.php?run_id=" . htmlspecialchars($new_run_id) . "'>Fetch and import sequences</a></p>";
+            echo "<p><a href='pw_vruns.php?run_id=" . htmlspecialchars($new_run_id) . "'>View run</a></p>";
 
         } catch (PDOException $e) {
             die("Unable to create run: " . $e->getMessage());
@@ -88,11 +111,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 echo <<<_TAIL1
-<form action="pw_p2.php" method="post">
+<form action="pw_p2.php" method="post" onsubmit="return validate(this)">
 <pre>
-Protein family     <input type="text" name="protein_family" size="40"/>
-Taxonomic group    <input type="text" name="taxon_query" size="40"/>
-Notes              <input type="text" name="notes" size="60"/>
+Protein family     <input type="text" name="protein_family" size="40"
+                     onfocus="showHelp('Enter a protein family, for example glucose-6-phosphatase or kinase')"
+                     onblur="clearHelp()"/>
+Taxonomic group    <input type="text" name="taxon_query" size="40"
+                     onfocus="showHelp('Enter a taxonomic group, for example Aves, Mammalia, or Rodentia')"
+                     onblur="clearHelp()"/>
+Max sequences      <input type="text" name="max_sequences" size="10"
+                     onfocus="showHelp('Enter the maximum number of sequences to retrieve')"
+                     onblur="clearHelp()"/>
+Notes              <input type="text" name="notes" size="60"
+                     onfocus="showHelp('Optional: add notes about this analysis run')"
+                     onblur="clearHelp()"/>
 
                    <input type="submit" value="Create Run"/>
 </pre>

@@ -7,6 +7,16 @@ echo <<<_HEAD1
 <html>
 <head>
     <title>Run Details</title>
+    <script type="text/javascript">
+    function toggleSection(id) {
+        var sec = document.getElementById(id);
+        if (sec.style.display === "none") {
+            sec.style.display = "block";
+        } else {
+            sec.style.display = "none";
+        }
+    }
+    </script>
 </head>
 <body>
 _HEAD1;
@@ -36,7 +46,7 @@ if ($run_id === '' || !ctype_digit($run_id)) {
 }
 
 $sql = "SELECT run_id, user_forname, user_surname, protein_family, taxon_query,
-               ncbi_query, run_type, status, sequence_count, created_at, notes
+               max_sequences, ncbi_query, run_type, status, sequence_count, created_at, notes
         FROM runs
         WHERE run_id = :run_id";
 
@@ -57,13 +67,17 @@ echo <<<_MAIN1
 <p>This page shows the details and outputs of a selected analysis run.</p>
 _MAIN1;
 
-echo "<h2>Run Metadata</h2>";
+// Run metadata
+echo '<h2 onclick="toggleSection(\'metadata_section\')" style="cursor:pointer;">Run Metadata (click to expand/collapse)</h2>';
+echo '<div id="metadata_section">';
+
 echo "<table border='1' cellpadding='6' cellspacing='0'>";
 echo "<tr><th>Field</th><th>Value</th></tr>";
 echo "<tr><td>Run ID</td><td>" . htmlspecialchars($run['run_id']) . "</td></tr>";
 echo "<tr><td>User</td><td>" . htmlspecialchars($run['user_forname'] . ' ' . $run['user_surname']) . "</td></tr>";
 echo "<tr><td>Protein Family</td><td>" . htmlspecialchars($run['protein_family']) . "</td></tr>";
 echo "<tr><td>Taxonomic Group</td><td>" . htmlspecialchars($run['taxon_query']) . "</td></tr>";
+echo "<tr><td>Max Sequences</td><td>" . htmlspecialchars($run['max_sequences']) . "</td></tr>";
 echo "<tr><td>NCBI Query</td><td>" . htmlspecialchars($run['ncbi_query']) . "</td></tr>";
 echo "<tr><td>Run Type</td><td>" . htmlspecialchars($run['run_type']) . "</td></tr>";
 echo "<tr><td>Status</td><td>" . htmlspecialchars($run['status']) . "</td></tr>";
@@ -72,12 +86,16 @@ echo "<tr><td>Created At</td><td>" . htmlspecialchars($run['created_at']) . "</t
 echo "<tr><td>Notes</td><td>" . htmlspecialchars($run['notes']) . "</td></tr>";
 echo "</table>";
 
+echo '</div>';
+
+// Analysis actions
 echo "<h2>Analysis Actions</h2>";
+echo "<p><a href='pw_import_proteins.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Fetch and import sequences for this run</a></p>";
 echo "<p><a href='pw_run_alignment.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run alignment for this dataset</a></p>";
 echo "<p><a href='pw_run_conservation.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run conservation analysis</a></p>";
 echo "<p><a href='pw_run_motifs.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run PROSITE motif scan for this dataset</a></p>";
 
-// Retrieve linked proteins for this run
+// Retrieve proteins
 $protein_sql = "SELECT protein_id, accession, protein_name, organism, seq_length
                 FROM proteins
                 WHERE run_id = :run_id
@@ -91,7 +109,8 @@ try {
     die("Unable to retrieve proteins: " . $e->getMessage());
 }
 
-echo "<h2>Protein Sequences in This Run</h2>";
+echo '<h2 onclick="toggleSection(\'proteins_section\')" style="cursor:pointer;">Protein Sequences in This Run (click to expand/collapse)</h2>';
+echo '<div id="proteins_section">';
 
 if (count($proteins) === 0) {
     echo "<p>No protein sequences have been stored for this run yet.</p>";
@@ -118,10 +137,13 @@ if (count($proteins) === 0) {
     echo "</table>";
 }
 
-// Motif report preview
+echo '</div>';
+
+// Motif preview
 $motif_txt = __DIR__ . "/runs/run_" . $run_id . "/motifs.txt";
 
-echo "<h2>Motif Report Preview</h2>";
+echo '<h2 onclick="toggleSection(\'motif_section\')" style="cursor:pointer;">Motif Report Preview (click to expand/collapse)</h2>';
+echo '<div id="motif_section" style="display:none;">';
 
 if (file_exists($motif_txt) && filesize($motif_txt) > 0) {
     $preview = file($motif_txt);
@@ -131,9 +153,13 @@ if (file_exists($motif_txt) && filesize($motif_txt) > 0) {
     echo "<p>No motif report preview available yet.</p>";
 }
 
-// Conservation plot display
+echo '</div>';
+
+// Conservation plot
 $conservation_file = __DIR__ . "/runs/run_" . $run_id . "/conservation.1.png";
-echo "<h2>Conservation Plot</h2>";
+
+echo '<h2 onclick="toggleSection(\'conservation_section\')" style="cursor:pointer;">Conservation Plot (click to expand/collapse)</h2>';
+echo '<div id="conservation_section">';
 
 if (file_exists($conservation_file) && filesize($conservation_file) > 0) {
     echo "<img src='runs/run_" . htmlspecialchars($run['run_id']) . "/conservation.1.png' width='700' alt='Conservation plot'>";
@@ -141,7 +167,9 @@ if (file_exists($conservation_file) && filesize($conservation_file) > 0) {
     echo "<p>No conservation plot available yet.</p>";
 }
 
-// Retrieve output files for this run
+echo '</div>';
+
+// Retrieve output files
 $file_sql = "SELECT file_id, file_type, file_path, description, created_at
              FROM run_files
              WHERE run_id = :run_id
@@ -155,7 +183,8 @@ try {
     die("Unable to retrieve run files: " . $e->getMessage());
 }
 
-echo "<h2>Analysis Output Files</h2>";
+echo '<h2 onclick="toggleSection(\'files_section\')" style="cursor:pointer;">Analysis Output Files (click to expand/collapse)</h2>';
+echo '<div id="files_section" style="display:none;">';
 
 if (count($run_files) === 0) {
     echo "<p>No output files have been recorded for this run yet.</p>";
@@ -179,6 +208,8 @@ if (count($run_files) === 0) {
 
     echo "</table>";
 }
+
+echo '</div>';
 
 echo "<p><a href='pw_pruns.php'>Back to Previous Runs</a></p>";
 

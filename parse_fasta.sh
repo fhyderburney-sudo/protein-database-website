@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# Usage:
-# ./parse_fasta.sh RUN_ID
-
 RUN_ID="$1"
-INDIR="$HOME/public_html/PW/runs/run_${RUN_ID}"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+INDIR="$SCRIPT_DIR/runs/run_${RUN_ID}"
 INFILE="$INDIR/sequences.fasta"
 OUTFILE="$INDIR/proteins.tsv"
 
