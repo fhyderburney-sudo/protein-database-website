@@ -7,10 +7,16 @@ echo <<<_HEAD1
 <html>
 <head>
     <title>Help and About</title>
+    <link rel="stylesheet" type="text/css" href="pw_style.css">
 </head>
 <body>
 _HEAD1;
 
+
+echo "<div style='background-color:#dceffe; padding:12px; margin-bottom:20px; border:1px solid #c0d8ef;'>";
+echo "<h1>Protein Sequence Analysis Website</h1>";
+echo "<p class='section-note'>Retrieve, analyse, and revisit protein datasets across taxonomic groups.</p>";
+echo "</div>";
 include 'pw_menuf.php';
 
 echo <<<_MAIN1

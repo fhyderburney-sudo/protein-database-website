@@ -7,9 +7,12 @@ echo <<<_HEAD1
 <html>
 <head>
     <title>Statement of Credits</title>
+    <link rel="stylesheet" type="text/css" href="pw_style.css">
 </head>
 <body>
 _HEAD1;
+
+
 
 include 'pw_menuf.php';
 

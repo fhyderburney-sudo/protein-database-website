@@ -3,7 +3,7 @@ session_start();
 require_once 'login.php';
 include 'pw_redir.php';
 
-echo "<html><head><title>Run Conservation Analysis</title></head><body>";
+echo "<html><head><title>Run Conservation Analysis</title> <link rel="stylesheet" type="text/css" href="pw_style.css"></head><body>";
 include 'pw_menuf.php';
 
 $charset = 'utf8mb4';

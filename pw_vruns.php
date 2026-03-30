@@ -7,6 +7,7 @@ echo <<<_HEAD1
 <html>
 <head>
     <title>Run Details</title>
+    <link rel="stylesheet" type="text/css" href="pw_style.css">
     <script type="text/javascript">
     function toggleSection(id) {
         var sec = document.getElementById(id);
@@ -20,6 +21,11 @@ echo <<<_HEAD1
 </head>
 <body>
 _HEAD1;
+
+echo "<div style='background-color:#dceffe; padding:12px; margin-bottom:20px; border:1px solid #c0d8ef;'>";
+echo "<h1>Protein Sequence Analysis Website</h1>";
+echo "<p class='section-note'>Retrieve, analyse, and revisit protein datasets across taxonomic groups.</p>";
+echo "</div>";
 
 include 'pw_menuf.php';
 
@@ -67,6 +73,8 @@ echo <<<_MAIN1
 <p>This page shows the details and outputs of a selected analysis run.</p>
 _MAIN1;
 
+echo "<p class='section-note'>Click section headings below to expand or collapse results.</p>";
+
 // Run metadata
 echo '<h2 onclick="toggleSection(\'metadata_section\')" style="cursor:pointer;">Run Metadata (click to expand/collapse)</h2>';
 echo '<div id="metadata_section">';
@@ -87,6 +95,10 @@ echo "<tr><td>Notes</td><td>" . htmlspecialchars($run['notes']) . "</td></tr>";
 echo "</table>";
 
 echo '</div>';
+
+echo "<h2>Export Data</h2>";
+echo "<p><a href='pw_run_json.php?run_id=" . htmlspecialchars($run_id) . "'>Download run as JSON</a></p>";
+echo "<p><a href='pw_run_xml.php?run_id=" . htmlspecialchars($run_id) . "'>Download run as XML</a></p>";
 
 // Analysis actions
 echo "<h2>Analysis Actions</h2>";

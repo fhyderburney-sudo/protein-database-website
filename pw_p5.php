@@ -7,10 +7,13 @@ $_SESSION = [];
 // Destroy the session
 session_destroy();
 
+
+
 echo <<<_HEAD1
 <html>
 <head>
     <title>Exit</title>
+    <link rel="stylesheet" type="text/css" href="pw_style.css">
 </head>
 <body>
 _HEAD1;
