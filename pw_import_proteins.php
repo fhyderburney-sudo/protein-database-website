@@ -3,7 +3,15 @@ session_start();
 require_once 'login.php';
 include 'pw_redir.php';
 
-echo "<html><head><title>Fetch and Import Sequences</title></head><body>";
+echo <<<_HEAD1
+<html>
+<head>
+    <title>Fetch and Import Sequences</title>
+    <link rel="stylesheet" type="text/css" href="pw_style.css">
+</head>
+<body>
+_HEAD1;
+
 include 'pw_menuf.php';
 
 $charset = 'utf8mb4';
@@ -22,12 +30,14 @@ try {
 }
 
 $run_id = $_GET['run_id'] ?? '';
+$user_session_key = $_SESSION['user_session_key'] ?? session_id();
 
 if ($run_id === '' || !ctype_digit($run_id)) {
     die("Invalid run ID.");
 }
 
-$run_sql = "SELECT run_id, protein_family, taxon_query, max_sequences, ncbi_query, status
+$run_sql = "SELECT run_id, user_session_key, protein_family, taxon_query,
+                   max_sequences, ncbi_query, run_type, status
             FROM runs
             WHERE run_id = :run_id";
 
@@ -43,7 +53,13 @@ if (!$run) {
     die("Run not found.");
 }
 
+// Access control: only current session or shared example runs
+if ($run['run_type'] !== 'example' && $run['user_session_key'] !== $user_session_key) {
+    die("You do not have permission to modify this run.");
+}
+
 echo "<h1>Fetch and Import Sequences</h1>";
+echo "<p>This page retrieves protein FASTA data from NCBI, parses it, and imports it into the database for the selected run.</p>";
 
 $query = $run['ncbi_query'];
 $max_sequences = (int)$run['max_sequences'];
@@ -79,7 +95,8 @@ $fetch_cmd = escapeshellarg($fetch_script) . " " .
              escapeshellarg($run_id) . " " .
              escapeshellarg($max_sequences) . " 2>&1";
 
-$parse_cmd = escapeshellarg($parse_script) . " " . escapeshellarg($run_id) . " 2>&1";
+$parse_cmd = escapeshellarg($parse_script) . " " .
+             escapeshellarg($run_id) . " 2>&1";
 
 echo "<h2>Step 1: Retrieve FASTA from NCBI</h2>";
 $fetch_output = shell_exec($fetch_cmd);
@@ -93,7 +110,7 @@ if (!file_exists($fasta_file) || filesize($fasta_file) === 0) {
         ':status' => 'failed',
         ':run_id' => $run_id
     ]);
-    die("<p>FASTA retrieval failed. Run status updated to failed.</p>");
+    die("<p>No sequences were found for this strict NCBI query. Run status was updated to failed. Try a more precise or differently annotated protein/taxon combination.</p>");
 }
 
 echo "<h2>Step 2: Parse FASTA into TSV</h2>";
@@ -217,9 +234,12 @@ try {
         }
     }
 
-    echo "<p>Imported $count protein records for run $run_id.</p>";
+    echo "<p>Imported " . htmlspecialchars((string)$count) . " protein records for run " . htmlspecialchars($run_id) . ".</p>";
     echo "<p>Final run status: " . htmlspecialchars($final_status) . "</p>";
-    echo "<p><a href='pw_vruns.php?run_id=" . htmlspecialchars($run_id) . "'>Back to run details</a></p>";
+    echo "<p>Redirecting to run details page...</p>";
+
+    echo "<meta http-equiv='refresh' content='2;url=pw_vruns.php?run_id=" . htmlspecialchars($run_id) . "'>";
+    echo "<p><a href='pw_vruns.php?run_id=" . htmlspecialchars($run_id) . "'>Go to run details now</a></p>";
 
 } catch (Exception $e) {
     $fail_stmt = $pdo->prepare("UPDATE runs SET status = :status WHERE run_id = :run_id");
@@ -227,15 +247,18 @@ try {
         ':status' => 'failed',
         ':run_id' => $run_id
     ]);
-    die("Import error: " . $e->getMessage());
+    die("Import error: " . htmlspecialchars($e->getMessage()));
 } catch (PDOException $e) {
     $fail_stmt = $pdo->prepare("UPDATE runs SET status = :status WHERE run_id = :run_id");
     $fail_stmt->execute([
         ':status' => 'failed',
         ':run_id' => $run_id
     ]);
-    die("Database error: " . $e->getMessage());
+    die("Database error: " . htmlspecialchars($e->getMessage()));
 }
 
-echo "</body></html>";
+echo <<<_TAIL1
+</body>
+</html>
+_TAIL1;
 ?>

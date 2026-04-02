@@ -2,20 +2,44 @@
 session_start();
 require_once 'login.php';
 
+// Optional: clear any previous session values when returning to the login page
+$_SESSION['forname'] = $_SESSION['forname'] ?? '';
+$_SESSION['surname'] = $_SESSION['surname'] ?? '';
+
 echo <<<_HEAD1
 <html>
 <head>
-  <link rel="stylesheet" type="text/css" href="pw_style.css">
-  <script type="text/javascript">
-  function showHelp(msg) {
-      document.getElementById("helpmsg").innerHTML = msg;
-  }
-  
-  function clearHelp() {
-      document.getElementById("helpmsg").innerHTML = "";
-  }
-  </script>
-<head>
+    <title>Login</title>
+    <link rel="stylesheet" type="text/css" href="pw_style.css">
+    <script type="text/javascript">
+    function showHelp(msg) {
+        document.getElementById("helpmsg").innerHTML = msg;
+    }
+
+    function clearHelp() {
+        document.getElementById("helpmsg").innerHTML = "";
+    }
+
+    function validate(form) {
+        let fail = "";
+
+        if (form.fn.value.trim() === "") {
+            fail += "Must give first name.\\n";
+        }
+
+        if (form.sn.value.trim() === "") {
+            fail += "Must give surname.\\n";
+        }
+
+        if (fail === "") {
+            return true;
+        } else {
+            alert(fail);
+            return false;
+        }
+    }
+    </script>
+</head>
 <body>
 _HEAD1;
 
@@ -24,68 +48,37 @@ echo "<h1>Protein Sequence Analysis Website</h1>";
 echo "<p class='section-note'>Retrieve, analyse, and revisit protein datasets across taxonomic groups.</p>";
 echo "</div>";
 
-// PDO connection
-$charset = 'utf8mb4';
-$dsn = "mysql:host=$hostname;dbname=$database;charset=$charset";
+echo <<<_MAIN1
+<h1>Login</h1>
 
-$options = [
-  PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-  PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-  PDO::ATTR_EMULATE_PREPARES => false,
-];
+<p>
+Welcome to the Protein Sequence Analysis Website.
+Please enter your name below to begin a session.
+</p>
 
-try {
-    $pdo = new PDO($dsn, $username, $password, $options);
-
-    $query = "SELECT * FROM Manufacturers";
-    $stmt = $pdo->query($query);
-
-    $data = $stmt->fetchAll();
-    $rows = count($data);
-
-    $mask = 0;
-    for ($j = 0; $j < $rows; ++$j) {
-        $mask = (2 * $mask) + 1;
-    }
-
-    $_SESSION['supmask'] = $mask;
-
-} catch (PDOException $e) {
-    die("Unable to connect to database or process query: " . $e->getMessage());
-}
-
-echo <<<_EOP
-<script>
-function validate(form) {
-    fail = "";
-    if (form.fn.value == "") fail = "Must Give Forname ";
-    if (form.sn.value == "") fail += "Must Give Surname";
-    if (fail == "") return true;
-    else {
-        alert(fail);
-        return false;
-    }
-}
-</script>
+<p id="helpmsg"></p>
 
 <form action="pw_index.php" method="post" onsubmit="return validate(this)">
 <pre>
-First Name   <input type="text" name="fn"/>
-Second Name  <input type="text" name="sn"/>
-             <input type="submit" value="go" />
+First Name   <input type="text" name="fn"
+               onfocus="showHelp('Enter your first name to begin your session')"
+               onblur="clearHelp()"/>
+
+Second Name  <input type="text" name="sn"
+               onfocus="showHelp('Enter your surname to begin your session')"
+               onblur="clearHelp()"/>
+
+             <input type="submit" value="Go" />
 </pre>
 </form>
-_EOP;
+
+<p>
+After logging in, you will be able to explore the shared example dataset or create your own analysis runs.
+</p>
+_MAIN1;
 
 echo <<<_TAIL1
 </body>
 </html>
 _TAIL1;
 ?>
-
-<p id="helpmsg"></p>
-
-<form action="pw_index.php" method="post">
-    First Name <input type="text" name="fn" onfocus="showHelp('Enter your first name')" onblur="clearHelp()"/>
-    Second Name <input type="text" name="sn" onfocus="showHelp('Enter your surname')" onblur="clearHelp()"/>
-</form>

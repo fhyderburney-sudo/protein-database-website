@@ -27,6 +27,7 @@ try {
 }
 
 $run_id = $_GET['run_id'] ?? '';
+$user_session_key = $_SESSION['user_session_key'] ?? session_id();
 
 if ($run_id === '' || !ctype_digit($run_id)) {
     echo json_encode([
@@ -36,8 +37,9 @@ if ($run_id === '' || !ctype_digit($run_id)) {
 }
 
 // Retrieve run metadata
-$run_sql = "SELECT run_id, user_forname, user_surname, protein_family, taxon_query,
-                   max_sequences, ncbi_query, run_type, status, sequence_count, created_at, notes
+$run_sql = "SELECT run_id, user_forname, user_surname, user_session_key,
+                   protein_family, taxon_query, max_sequences, ncbi_query,
+                   run_type, status, sequence_count, created_at, notes
             FROM runs
             WHERE run_id = :run_id";
 
@@ -56,6 +58,14 @@ try {
 if (!$run) {
     echo json_encode([
         'error' => 'Run not found'
+    ], JSON_PRETTY_PRINT);
+    exit();
+}
+
+// Access control: only current session or shared example runs
+if ($run['run_type'] !== 'example' && $run['user_session_key'] !== $user_session_key) {
+    echo json_encode([
+        'error' => 'You do not have permission to access this run'
     ], JSON_PRETTY_PRINT);
     exit();
 }
@@ -95,6 +105,9 @@ try {
     ], JSON_PRETTY_PRINT);
     exit();
 }
+
+// Remove internal session key before returning JSON if you do not want to expose it
+unset($run['user_session_key']);
 
 $output = [
     'run' => $run,

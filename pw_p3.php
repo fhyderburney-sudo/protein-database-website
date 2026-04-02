@@ -35,28 +35,35 @@ try {
     die("Unable to connect to database: " . $e->getMessage());
 }
 
+$user_session_key = $_SESSION['user_session_key'] ?? session_id();
+
 echo <<<_MAIN1
 <h1>Statistics</h1>
 <p>
-This page summarises the protein data currently stored in the database.
+This page summarises the protein data currently visible to your session.
 It provides descriptive statistics for imported protein sequences and for individual analysis runs.
+Shared example data are included, alongside runs created in your current session.
 </p>
 _MAIN1;
 
 // --------------------
-// Overall protein statistics
+// Overall protein statistics for current session + example runs
 // --------------------
 $stats_sql = "SELECT 
                 COUNT(*) AS total_proteins,
-                COUNT(DISTINCT organism) AS total_organisms,
-                AVG(seq_length) AS avg_length,
-                MIN(seq_length) AS min_length,
-                MAX(seq_length) AS max_length,
-                STD(seq_length) AS std_length
-              FROM proteins";
+                COUNT(DISTINCT p.organism) AS total_organisms,
+                AVG(p.seq_length) AS avg_length,
+                MIN(p.seq_length) AS min_length,
+                MAX(p.seq_length) AS max_length,
+                STD(p.seq_length) AS std_length
+              FROM proteins p
+              JOIN runs r ON p.run_id = r.run_id
+              WHERE r.user_session_key = :usk
+                 OR r.run_type = 'example'";
 
 try {
-    $stmt = $pdo->query($stats_sql);
+    $stmt = $pdo->prepare($stats_sql);
+    $stmt->execute([':usk' => $user_session_key]);
     $stats = $stmt->fetch();
 } catch (PDOException $e) {
     die("Unable to retrieve overall statistics: " . $e->getMessage());
@@ -65,7 +72,7 @@ try {
 echo "<h2>Overall Protein Statistics</h2>";
 
 if (!$stats || $stats['total_proteins'] == 0) {
-    echo "<p>No protein records are currently stored in the database.</p>";
+    echo "<p>No protein records are currently available for this session.</p>";
 } else {
     echo "<table border='1' cellpadding='6' cellspacing='0'>";
     echo "<tr><th>Statistic</th><th>Value</th></tr>";
@@ -78,23 +85,27 @@ if (!$stats || $stats['total_proteins'] == 0) {
     echo "</table>";
 
     echo "<p>";
-    echo "These values summarise all protein sequences currently imported into the website database. ";
+    echo "These values summarise all protein sequences currently visible to your session, including the shared example dataset. ";
     echo "Sequence length statistics can help indicate whether datasets are relatively uniform or contain broader variation.";
     echo "</p>";
 }
 
 // --------------------
-// Top organisms summary
+// Top organisms summary for current session + example runs
 // --------------------
-$organism_sql = "SELECT organism, COUNT(*) AS protein_count
-                 FROM proteins
-                 WHERE organism IS NOT NULL AND organism <> ''
-                 GROUP BY organism
-                 ORDER BY protein_count DESC, organism ASC
+$organism_sql = "SELECT p.organism, COUNT(*) AS protein_count
+                 FROM proteins p
+                 JOIN runs r ON p.run_id = r.run_id
+                 WHERE (r.user_session_key = :usk OR r.run_type = 'example')
+                   AND p.organism IS NOT NULL
+                   AND p.organism <> ''
+                 GROUP BY p.organism
+                 ORDER BY protein_count DESC, p.organism ASC
                  LIMIT 10";
 
 try {
-    $org_stmt = $pdo->query($organism_sql);
+    $org_stmt = $pdo->prepare($organism_sql);
+    $org_stmt->execute([':usk' => $user_session_key]);
     $organism_stats = $org_stmt->fetchAll();
 } catch (PDOException $e) {
     die("Unable to retrieve organism statistics: " . $e->getMessage());
@@ -119,7 +130,7 @@ if (count($organism_stats) === 0) {
 }
 
 // --------------------
-// Statistics by run
+// Statistics by run for current session + example runs
 // --------------------
 $run_stats_sql = "SELECT 
                     r.run_id,
@@ -134,11 +145,14 @@ $run_stats_sql = "SELECT
                     MAX(p.seq_length) AS max_length
                   FROM runs r
                   LEFT JOIN proteins p ON r.run_id = p.run_id
+                  WHERE r.user_session_key = :usk
+                     OR r.run_type = 'example'
                   GROUP BY r.run_id, r.protein_family, r.taxon_query, r.run_type, r.status, r.sequence_count
                   ORDER BY r.run_id DESC";
 
 try {
-    $stmt2 = $pdo->query($run_stats_sql);
+    $stmt2 = $pdo->prepare($run_stats_sql);
+    $stmt2->execute([':usk' => $user_session_key]);
     $run_stats = $stmt2->fetchAll();
 } catch (PDOException $e) {
     die("Unable to retrieve run statistics: " . $e->getMessage());
@@ -147,7 +161,7 @@ try {
 echo "<h2>Statistics by Run</h2>";
 
 if (count($run_stats) === 0) {
-    echo "<p>No runs are currently available.</p>";
+    echo "<p>No runs are currently available for this session.</p>";
 } else {
     echo "<table border='1' cellpadding='6' cellspacing='0'>";
     echo "<tr>";
@@ -183,8 +197,8 @@ if (count($run_stats) === 0) {
     echo "</table>";
 
     echo "<p>";
-    echo "Run-level statistics help compare different user-created and example datasets, including how many proteins were imported ";
-    echo "and whether sequence lengths vary substantially between runs.";
+    echo "Run-level statistics help compare the shared example dataset with runs created in your current session, ";
+    echo "including how many proteins were imported and whether sequence lengths vary substantially between runs.";
     echo "</p>";
 }
 

@@ -46,12 +46,13 @@ try {
 }
 
 $run_id = $_GET['run_id'] ?? '';
+$user_session_key = $_SESSION['user_session_key'] ?? session_id();
 
 if ($run_id === '' || !ctype_digit($run_id)) {
     die("Invalid run ID.");
 }
 
-$sql = "SELECT run_id, user_forname, user_surname, protein_family, taxon_query,
+$sql = "SELECT run_id, user_forname, user_surname, user_session_key, protein_family, taxon_query,
                max_sequences, ncbi_query, run_type, status, sequence_count, created_at, notes
         FROM runs
         WHERE run_id = :run_id";
@@ -68,12 +69,45 @@ if (!$run) {
     die("Run not found.");
 }
 
+// Access control: only current session or shared example runs
+if ($run['run_type'] !== 'example' && $run['user_session_key'] !== $user_session_key) {
+    die("You do not have permission to view this run.");
+}
+
 echo <<<_MAIN1
 <h1>Run Details</h1>
 <p>This page shows the details and outputs of a selected analysis run.</p>
 _MAIN1;
 
 echo "<p class='section-note'>Click section headings below to expand or collapse results.</p>";
+
+// Detect key files
+$fasta_abs = __DIR__ . "/runs/run_" . $run_id . "/sequences.fasta";
+$alignment_abs = __DIR__ . "/runs/run_" . $run_id . "/alignment.aln";
+$motif_abs = __DIR__ . "/runs/run_" . $run_id . "/motifs.txt";
+
+$has_fasta = file_exists($fasta_abs) && filesize($fasta_abs) > 0;
+$has_alignment = file_exists($alignment_abs) && filesize($alignment_abs) > 0;
+$has_motif = file_exists($motif_abs) && filesize($motif_abs) > 0;
+
+// Find conservation plot robustly
+$conservation_candidates = [
+    "runs/run_" . $run_id . "/conservation.1.png",
+    "runs/run_" . $run_id . "/conservation.png",
+    "runs/run_" . $run_id . "/conservation.png.1.png"
+];
+
+$conservation_rel = null;
+$conservation_abs = null;
+
+foreach ($conservation_candidates as $candidate) {
+    $abs = __DIR__ . "/" . $candidate;
+    if (file_exists($abs) && filesize($abs) > 0) {
+        $conservation_rel = $candidate;
+        $conservation_abs = $abs;
+        break;
+    }
+}
 
 // Run metadata
 echo '<h2 onclick="toggleSection(\'metadata_section\')" style="cursor:pointer;">Run Metadata (click to expand/collapse)</h2>';
@@ -96,16 +130,33 @@ echo "</table>";
 
 echo '</div>';
 
+// Export data
 echo "<h2>Export Data</h2>";
 echo "<p><a href='pw_run_json.php?run_id=" . htmlspecialchars($run_id) . "'>Download run as JSON</a></p>";
 echo "<p><a href='pw_run_xml.php?run_id=" . htmlspecialchars($run_id) . "'>Download run as XML</a></p>";
 
 // Analysis actions
 echo "<h2>Analysis Actions</h2>";
+
 echo "<p><a href='pw_import_proteins.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Fetch and import sequences for this run</a></p>";
-echo "<p><a href='pw_run_alignment.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run alignment for this dataset</a></p>";
-echo "<p><a href='pw_run_conservation.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run conservation analysis</a></p>";
-echo "<p><a href='pw_run_motifs.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run PROSITE motif scan for this dataset</a></p>";
+
+if ($has_fasta) {
+    echo "<p><a href='pw_run_alignment.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run alignment for this dataset</a></p>";
+} else {
+    echo "<p>Run alignment for this dataset <span class='section-note'>(available after sequences have been imported)</span></p>";
+}
+
+if ($has_alignment) {
+    echo "<p><a href='pw_run_conservation.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run conservation analysis</a></p>";
+} else {
+    echo "<p><a href='pw_run_conservation.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run conservation analysis</a> <span class='section-note'>(alignment will be created automatically if missing)</span></p>";
+}
+
+if ($has_fasta) {
+    echo "<p><a href='pw_run_motifs.php?run_id=" . htmlspecialchars($run['run_id']) . "'>Run PROSITE motif scan for this dataset</a></p>";
+} else {
+    echo "<p>Run PROSITE motif scan for this dataset <span class='section-note'>(available after sequences have been imported)</span></p>";
+}
 
 // Retrieve proteins
 $protein_sql = "SELECT protein_id, accession, protein_name, organism, seq_length
@@ -152,13 +203,11 @@ if (count($proteins) === 0) {
 echo '</div>';
 
 // Motif preview
-$motif_txt = __DIR__ . "/runs/run_" . $run_id . "/motifs.txt";
-
 echo '<h2 onclick="toggleSection(\'motif_section\')" style="cursor:pointer;">Motif Report Preview (click to expand/collapse)</h2>';
 echo '<div id="motif_section" style="display:none;">';
 
-if (file_exists($motif_txt) && filesize($motif_txt) > 0) {
-    $preview = file($motif_txt);
+if ($has_motif) {
+    $preview = file($motif_abs);
     $preview = array_slice($preview, 0, 40);
     echo "<pre>" . htmlspecialchars(implode("", $preview)) . "</pre>";
 } else {
@@ -168,15 +217,16 @@ if (file_exists($motif_txt) && filesize($motif_txt) > 0) {
 echo '</div>';
 
 // Conservation plot
-$conservation_file = __DIR__ . "/runs/run_" . $run_id . "/conservation.1.png";
-
 echo '<h2 onclick="toggleSection(\'conservation_section\')" style="cursor:pointer;">Conservation Plot (click to expand/collapse)</h2>';
 echo '<div id="conservation_section">';
 
-if (file_exists($conservation_file) && filesize($conservation_file) > 0) {
-    echo "<img src='runs/run_" . htmlspecialchars($run['run_id']) . "/conservation.1.png' width='700' alt='Conservation plot'>";
+if ($conservation_abs !== null) {
+    echo "<img src='" . htmlspecialchars($conservation_rel) . "' width='700' alt='Conservation plot'>";
 } else {
     echo "<p>No conservation plot available yet.</p>";
+    if (!$has_alignment) {
+        echo "<p class='section-note'>This is usually because no alignment has been generated yet. Running conservation analysis will now try to create the alignment automatically first.</p>";
+    }
 }
 
 echo '</div>';
