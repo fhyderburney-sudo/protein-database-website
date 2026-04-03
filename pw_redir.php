@@ -12,7 +12,7 @@ if (
     $_SESSION['surname'] === '' ||
     $_SESSION['user_session_key'] === ''
 ) {
-    header('Location: pw_complib.php');
+    header('Location: pw.php');
     exit();
 }
 ?>

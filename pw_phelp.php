@@ -47,7 +47,7 @@ and explore the resulting data through alignments, conservation analysis, and mo
         <strong>Statistics:</strong> view summary statistics for stored protein sequence data.
     </li>
     <li>
-        <strong>Plots:</strong> view available visual outputs, such as conservation plots.
+        <strong>Outputs:</strong> quick view runs, view available visual outputs, and sequence length barchart.
     </li>
     <li>
         <strong>Sequence Tools:</strong> reserved for sequence-related actions and extensions.

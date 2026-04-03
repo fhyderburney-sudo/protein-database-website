@@ -59,16 +59,40 @@ if ($run['run_type'] !== 'example' && $run['user_session_key'] !== $user_session
 }
 
 $script = __DIR__ . "/run_motifs.sh";
+$fasta_file = __DIR__ . "/runs/run_" . $run_id . "/sequences.fasta";
+$motif_file = __DIR__ . "/runs/run_" . $run_id . "/motifs.txt";
+$rel_path = "runs/run_" . $run_id . "/motifs.txt";
 
 if (!file_exists($script)) {
     die("Motif script not found.");
 }
 
-$script_arg = escapeshellarg($script);
-$run_id_arg = escapeshellarg($run_id);
-
 echo "<h1>Run Motif Scan</h1>";
 echo "<p>This page runs EMBOSS patmatmotifs on the selected sequence set and records the resulting motif report.</p>";
+
+// Require sequences first
+if (!file_exists($fasta_file) || filesize($fasta_file) === 0) {
+    try {
+        $fail_stmt = $pdo->prepare("UPDATE runs SET status = :status WHERE run_id = :run_id");
+        $fail_stmt->execute([
+            ':status' => 'failed',
+            ':run_id' => $run_id
+        ]);
+    } catch (PDOException $e) {
+        die("Missing FASTA file, and status update also failed: " . $e->getMessage());
+    }
+
+    echo "<p>No imported FASTA file is available for this run, so motif scanning cannot continue.</p>";
+    echo "<p>Please fetch and import sequences for this run first.</p>";
+    echo "<p><a href='pw_import_proteins.php?run_id=" . htmlspecialchars($run_id) . "'>Fetch and import sequences for this run</a></p>";
+    echo "<p><a href='pw_vruns.php?run_id=" . htmlspecialchars($run_id) . "'>Back to run details</a></p>";
+
+    echo <<<_TAIL0
+</body>
+</html>
+_TAIL0;
+    exit();
+}
 
 // Mark run as running
 try {
@@ -81,16 +105,18 @@ try {
     die("Unable to update run status to running: " . $e->getMessage());
 }
 
+$script_arg = escapeshellarg($script);
+$run_id_arg = escapeshellarg($run_id);
+
 $command = "$script_arg $run_id_arg 2>&1";
 $output = shell_exec($command);
 
 echo "<h2>Motif Scan Output</h2>";
 echo "<pre>" . htmlspecialchars($output ?? 'No output returned.') . "</pre>";
 
-$motif_file = __DIR__ . "/runs/run_" . $run_id . "/motifs.txt";
-$rel_path = "runs/run_" . $run_id . "/motifs.txt";
+$scan_succeeded = (strpos($output, "Motif report saved") !== false && file_exists($motif_file) && filesize($motif_file) > 0);
 
-if (strpos($output, "Motif report saved") !== false && file_exists($motif_file) && filesize($motif_file) > 0) {
+if ($scan_succeeded) {
     try {
         $check_sql = "SELECT file_id
                       FROM run_files
@@ -104,9 +130,7 @@ if (strpos($output, "Motif report saved") !== false && file_exists($motif_file) 
             ':file_path' => $rel_path
         ]);
 
-        $existing = $check_stmt->fetch();
-
-        if (!$existing) {
+        if (!$check_stmt->fetch()) {
             $insert_sql = "INSERT INTO run_files (run_id, file_type, file_path, description)
                            VALUES (:run_id, :file_type, :file_path, :description)";
             $insert_stmt = $pdo->prepare($insert_sql);
@@ -125,7 +149,19 @@ if (strpos($output, "Motif report saved") !== false && file_exists($motif_file) 
         ]);
 
         echo "<p>Motif scan completed successfully.</p>";
+
+        if (strpos($output, "No PROSITE hits were found") !== false) {
+            echo "<p>No PROSITE motif hits were detected in the scanned sequences.</p>";
+        } elseif (strpos($output, "At least one PROSITE hit was found") !== false) {
+            echo "<p>One or more PROSITE motif hits were detected in this run.</p>";
+        } else {
+            echo "<p>The motif scan finished successfully. Open the report below to inspect the detailed results.</p>";
+        }
+
         echo "<p><a href='" . htmlspecialchars($rel_path) . "'>Open motif report</a></p>";
+        echo "<p>Redirecting to run details page...</p>";
+        echo "<meta http-equiv='refresh' content='2;url=pw_vruns.php?run_id=" . htmlspecialchars($run_id) . "'>";
+        echo "<p><a href='pw_vruns.php?run_id=" . htmlspecialchars($run_id) . "'>Go to run details now</a></p>";
     } catch (PDOException $e) {
         die("Motif scan completed, but database update failed: " . $e->getMessage());
     }
@@ -141,9 +177,8 @@ if (strpos($output, "Motif report saved") !== false && file_exists($motif_file) 
     }
 
     echo "<p>Motif scan failed or no motif report was produced.</p>";
+    echo "<p><a href='pw_vruns.php?run_id=" . htmlspecialchars($run_id) . "'>Back to run details</a></p>";
 }
-
-echo "<p><a href='pw_vruns.php?run_id=" . htmlspecialchars($run_id) . "'>Back to run details</a></p>";
 
 echo <<<_TAIL1
 </body>

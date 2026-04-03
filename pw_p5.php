@@ -117,7 +117,7 @@ echo "<h1>You have been logged out</h1>";
 echo "<p>Your session has been ended successfully.</p>";
 echo "<p>Deleted non-example runs for this session: " . htmlspecialchars((string)$deleted_runs) . "</p>";
 echo "<p>The example dataset has been preserved.</p>";
-echo "<p><a href='pw_complib.php'>Return to login page</a></p>";
+echo "<p><a href='pw.php'>Return to login page</a></p>";
 
 echo <<<_TAIL2
 </body>

@@ -52,13 +52,14 @@ echo <<<_HEAD1
                         html += "<tr><td>Created At</td><td>" + escapeHtml(String(data.run.created_at)) + "</td></tr>";
                         html += "</table>";
 
-                        html += "<h3>Interactive Sequence Length Chart</h3>";
+                        html += "<h3>Sequence Length Chart</h3>";
                         if (data.proteins.length === 0) {
                             html += "<p>No proteins stored for this run, so no chart can be drawn.</p>";
                         } else {
-                            html += "<p>This chart shows sequence length for proteins in the selected run.</p>";
-                            html += "<canvas id='lengthChart' width='900' height='420' style='border:1px solid #cccccc; background:#ffffff;'></canvas>";
-                            html += "<p class='section-note'>Bars represent individual imported proteins. Labels show accession and organism.</p>";
+                            html += "<p>This chart shows sequence length for proteins in the selected run. For readability, the chart displays up to 20 proteins as horizontal bars.</p>";
+                            html += "<canvas id='lengthChart' width='1100' height='700' style='border:1px solid #cccccc; background:#ffffff;'></canvas>";
+                            html += "<p class='section-note'>Bars represent imported proteins labelled with accession numbers and y-axis is sequence length in amino acids (aa).</p>";
+                            html += "<div id='chartLegend'></div>";
                         }
 
                         html += "<h3>Proteins</h3>";
@@ -137,17 +138,20 @@ echo <<<_HEAD1
 
         ctx.clearRect(0, 0, width, height);
 
-        var marginLeft = 70;
-        var marginRight = 20;
-        var marginTop = 30;
-        var marginBottom = 140;
+        // Limit to first 20 proteins
+        var plottedProteins = proteins.slice(0, 20);
+
+        var marginLeft = 220;
+        var marginRight = 40;
+        var marginTop = 50;
+        var marginBottom = 70;
 
         var chartWidth = width - marginLeft - marginRight;
         var chartHeight = height - marginTop - marginBottom;
 
         var maxLen = 0;
-        for (var i = 0; i < proteins.length; i++) {
-            var len = parseInt(proteins[i].seq_length);
+        for (var i = 0; i < plottedProteins.length; i++) {
+            var len = parseInt(plottedProteins[i].seq_length);
             if (len > maxLen) {
                 maxLen = len;
             }
@@ -166,64 +170,87 @@ echo <<<_HEAD1
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // Y-axis ticks
+        // X-axis ticks
         ctx.fillStyle = "#222222";
         ctx.font = "12px Arial";
         var tickCount = 5;
+
         for (var t = 0; t <= tickCount; t++) {
             var value = Math.round((maxLen / tickCount) * t);
-            var y = marginTop + chartHeight - (chartHeight * t / tickCount);
+            var x = marginLeft + (chartWidth * t / tickCount);
 
             ctx.beginPath();
-            ctx.moveTo(marginLeft - 5, y);
-            ctx.lineTo(marginLeft, y);
+            ctx.moveTo(x, marginTop + chartHeight);
+            ctx.lineTo(x, marginTop + chartHeight + 5);
             ctx.stroke();
 
-            ctx.fillText(String(value), 10, y + 4);
+            ctx.fillText(String(value), x - 10, marginTop + chartHeight + 22);
         }
 
         // Title
         ctx.font = "16px Arial";
-        ctx.fillText("Protein sequence length by imported protein", marginLeft, 18);
+        ctx.fillStyle = "#222222";
+        ctx.fillText("Protein sequence length by imported protein", marginLeft, 25);
 
-        // Bars
-        var n = proteins.length;
-        var gap = 10;
-        var barWidth = Math.max(8, (chartWidth - gap * (n - 1)) / n);
+        // Horizontal bars
+        var n = plottedProteins.length;
+        var gap = 8;
+        var barHeight = Math.max(16, (chartHeight - gap * (n - 1)) / n);
 
         for (var j = 0; j < n; j++) {
-            var p = proteins[j];
+            var p = plottedProteins[j];
             var seqLen = parseInt(p.seq_length);
-            var barHeight = (seqLen / maxLen) * chartHeight;
+            var scaledWidth = (seqLen / maxLen) * chartWidth;
 
-            var x = marginLeft + j * (barWidth + gap);
-            var yTop = marginTop + chartHeight - barHeight;
+            var y = marginTop + j * (barHeight + gap);
 
             ctx.fillStyle = "#6fa8dc";
-            ctx.fillRect(x, yTop, barWidth, barHeight);
+            ctx.fillRect(marginLeft, y, scaledWidth, barHeight);
 
             ctx.strokeStyle = "#3d6b99";
-            ctx.strokeRect(x, yTop, barWidth, barHeight);
+            ctx.strokeRect(marginLeft, y, scaledWidth, barHeight);
 
-            // Rotated x labels
-            var label = p.accession + " | " + p.organism;
-            ctx.save();
-            ctx.translate(x + barWidth / 2, marginTop + chartHeight + 10);
-            ctx.rotate(-Math.PI / 3);
+            // Y labels: accession only
             ctx.fillStyle = "#222222";
-            ctx.font = "11px Arial";
-            ctx.fillText(label, 0, 0);
-            ctx.restore();
+            ctx.font = "12px Arial";
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            ctx.fillText(String(p.accession), marginLeft - 10, y + barHeight / 2);
+
+            // Bar-end values
+            ctx.textAlign = "left";
+            ctx.fillText(String(seqLen), marginLeft + scaledWidth + 6, y + barHeight / 2);
         }
 
-        // Y axis label
-        ctx.save();
-        ctx.translate(18, marginTop + chartHeight / 2);
-        ctx.rotate(-Math.PI / 2);
+        // X-axis label
         ctx.font = "13px Arial";
+        ctx.textAlign = "center";
         ctx.fillStyle = "#222222";
-        ctx.fillText("Sequence length (aa)", 0, 0);
-        ctx.restore();
+        ctx.fillText("Sequence length (aa)", marginLeft + chartWidth / 2, height - 15);
+
+        // Legend table
+        var legendDiv = document.getElementById("chartLegend");
+        if (legendDiv) {
+            var legendHtml = "<h4>Chart label key</h4>";
+            legendHtml += "<table border='1' cellpadding='6' cellspacing='0'>";
+            legendHtml += "<tr><th>Accession</th><th>Organism</th><th>Length</th></tr>";
+
+            for (var k = 0; k < plottedProteins.length; k++) {
+                legendHtml += "<tr>";
+                legendHtml += "<td>" + escapeHtml(String(plottedProteins[k].accession)) + "</td>";
+                legendHtml += "<td>" + escapeHtml(String(plottedProteins[k].organism)) + "</td>";
+                legendHtml += "<td>" + escapeHtml(String(plottedProteins[k].seq_length)) + "</td>";
+                legendHtml += "</tr>";
+            }
+
+            legendHtml += "</table>";
+
+            if (proteins.length > 20) {
+                legendHtml += "<p class='section-note'>Only the first 20 proteins are shown in the chart to keep the visualisation readable.</p>";
+            }
+
+            legendDiv.innerHTML = legendHtml;
+        }
     }
     </script>
 </head>
@@ -268,7 +295,7 @@ which regions of a protein family are relatively conserved across the selected s
 </p>
 _MAIN1;
 
-// Retrieve recent runs for AJAX shortcuts (current session + example runs only)
+// Retrieve recent runs for AJAX shortcuts
 $recent_sql = "SELECT run_id, protein_family, taxon_query, run_type, created_at
                FROM runs
                WHERE user_session_key = :usk
@@ -284,8 +311,8 @@ try {
     die("Unable to retrieve recent runs: " . $e->getMessage());
 }
 
-echo "<h2>AJAX Run Viewer and Interactive Chart</h2>";
-echo "<p>Quickly retrieve and visualise run data from the JSON export without reloading the page.</p>";
+echo "<h2>AJAX Run Viewer and Sequence Length Barchart</h2>";
+echo "<p>Quickly retrieve and visualise run data from the JSON export.</p>";
 
 echo "<p>";
 echo "Run ID: ";
@@ -337,7 +364,7 @@ if (file_exists($example_plot) && filesize($example_plot) > 0) {
     echo "<p>No example conservation plot is currently available.</p>";
 }
 
-// Retrieve conservation plot outputs (current session + example runs only)
+// Retrieve conservation plot outputs
 $plot_sql = "SELECT r.run_id, r.protein_family, r.taxon_query, r.run_type,
                     rf.file_path, rf.description, rf.created_at
              FROM run_files rf
@@ -387,7 +414,7 @@ if (count($plots) === 0) {
     echo "</table>";
 }
 
-// Retrieve all output files (current session + example runs only)
+// Retrieve all output files
 $file_sql = "SELECT r.run_id, r.protein_family, r.taxon_query, r.run_type,
                     rf.file_type, rf.file_path, rf.description, rf.created_at
              FROM run_files rf
